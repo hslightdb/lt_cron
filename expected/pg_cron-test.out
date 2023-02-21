@@ -1,0 +1,282 @@
+CREATE EXTENSION lt_cron VERSION '1.0';
+SELECT extversion FROM pg_extension WHERE extname='lt_cron';
+ extversion 
+------------
+ 1.0
+(1 row)
+
+ALTER EXTENSION lt_cron UPDATE TO '1.5';
+SELECT extversion FROM pg_extension WHERE extname='lt_cron';
+ extversion 
+------------
+ 1.5
+(1 row)
+
+-- Vacuum every day at 10:00am (GMT)
+SELECT cron.schedule('0 10 * * *', 'VACUUM');
+ schedule 
+----------
+        1
+(1 row)
+
+-- Stop scheduling a job
+SELECT cron.unschedule(1);
+ unschedule 
+------------
+ t
+(1 row)
+
+-- Invalid input: input too long
+SELECT cron.schedule(repeat('a', 1000), '');
+ERROR:  invalid schedule: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+-- Try to update lt_cron on restart
+SELECT cron.schedule('@restar', 'ALTER EXTENSION lt_cron UPDATE');
+ERROR:  invalid schedule: @restar
+SELECT cron.schedule('@restart', 'ALTER EXTENSION lt_cron UPDATE');
+ schedule 
+----------
+        2
+(1 row)
+
+-- Vacuum every day at 10:00am (GMT)
+SELECT cron.schedule('myvacuum', '0 10 * * *', 'VACUUM');
+ schedule 
+----------
+        3
+(1 row)
+
+SELECT jobid, jobname, schedule, command FROM cron.job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             
+-------+----------+------------+--------------------------------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE
+     3 | myvacuum | 0 10 * * * | VACUUM
+(2 rows)
+
+-- Make that 11:00am (GMT)
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM');
+ schedule 
+----------
+        3
+(1 row)
+
+SELECT jobid, jobname, schedule, command FROM cron.job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             
+-------+----------+------------+--------------------------------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE
+     3 | myvacuum | 0 11 * * * | VACUUM
+(2 rows)
+
+-- Make that VACUUM FULL
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM FULL');
+ schedule 
+----------
+        3
+(1 row)
+
+SELECT jobid, jobname, schedule, command FROM cron.job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             
+-------+----------+------------+--------------------------------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE
+     3 | myvacuum | 0 11 * * * | VACUUM FULL
+(2 rows)
+
+-- Stop scheduling a job
+SELECT cron.unschedule('myvacuum');
+ unschedule 
+------------
+ t
+(1 row)
+
+SELECT jobid, jobname, schedule, command FROM cron.job ORDER BY jobid;
+ jobid | jobname | schedule |            command             
+-------+---------+----------+--------------------------------
+     2 |         | @restart | ALTER EXTENSION lt_cron UPDATE
+(1 row)
+
+-- Make that 11:00:12am (GMT)
+SELECT cron.schedule('myvacuum', '12 0 11 * * *', 'VACUUM');
+ schedule 
+----------
+        6
+(1 row)
+
+SELECT jobid, jobname, schedule, command FROM cron.job ORDER BY jobid;
+ jobid | jobname  |   schedule    |            command             
+-------+----------+---------------+--------------------------------
+     2 |          | @restart      | ALTER EXTENSION lt_cron UPDATE
+     6 | myvacuum | 12 0 11 * * * | VACUUM
+(2 rows)
+
+-- Stop scheduling a job
+SELECT cron.unschedule(6);
+ unschedule 
+------------
+ t
+(1 row)
+
+-- Make that 11:00am (GMT) single
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM', 'single');
+ schedule 
+----------
+        7
+(1 row)
+
+SELECT jobid, jobname, schedule, command, mode FROM cron.lt_job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             |  mode  
+-------+----------+------------+--------------------------------+--------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE | next
+     7 | myvacuum | 0 11 * * * | VACUUM                         | single
+(2 rows)
+
+-- Make that 11:00am (GMT) timing
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM', 'timing');
+ schedule 
+----------
+        7
+(1 row)
+
+SELECT jobid, jobname, schedule, command, mode FROM cron.lt_job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             |  mode  
+-------+----------+------------+--------------------------------+--------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE | next
+     7 | myvacuum | 0 11 * * * | VACUUM                         | timing
+(2 rows)
+
+-- Stop scheduling a job
+SELECT cron.unschedule(7);
+ unschedule 
+------------
+ t
+(1 row)
+
+-- Make that 11:00am (GMT) zone 8
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM', 'timing', '8');
+ schedule 
+----------
+        9
+(1 row)
+
+SELECT jobid, jobname, schedule, command, timezone FROM cron.lt_job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             | timezone 
+-------+----------+------------+--------------------------------+----------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE | 8
+     9 | myvacuum | 0 11 * * * | VACUUM                         | 8
+(2 rows)
+
+-- Make that 11:00am (GMT) zone -8
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM', 'timing', '-8');
+ schedule 
+----------
+        9
+(1 row)
+
+SELECT jobid, jobname, schedule, command, timezone FROM cron.lt_job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             | timezone 
+-------+----------+------------+--------------------------------+----------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE | 8
+     9 | myvacuum | 0 11 * * * | VACUUM                         | -8
+(2 rows)
+
+-- Make that 11:00am (GMT) next interval
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM', 'next');
+ schedule 
+----------
+        9
+(1 row)
+
+SELECT jobid, jobname, schedule, command, mode FROM cron.lt_job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             | mode 
+-------+----------+------------+--------------------------------+------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE | next
+     9 | myvacuum | 0 11 * * * | VACUUM                         | next
+(2 rows)
+
+-- Make that 11:00am (GMT) asap
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM', 'asap');
+ schedule 
+----------
+        9
+(1 row)
+
+SELECT jobid, jobname, schedule, command, mode FROM cron.lt_job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             | mode 
+-------+----------+------------+--------------------------------+------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE | next
+     9 | myvacuum | 0 11 * * * | VACUUM                         | asap
+(2 rows)
+
+-- Make that 11:00am (GMT) fixed interval
+SELECT cron.schedule('myvacuum', '0 11 * * *', 'VACUUM', 'fixed');
+ schedule 
+----------
+        9
+(1 row)
+
+SELECT jobid, jobname, schedule, command, mode FROM cron.lt_job ORDER BY jobid;
+ jobid | jobname  |  schedule  |            command             | mode  
+-------+----------+------------+--------------------------------+-------
+     2 |          | @restart   | ALTER EXTENSION lt_cron UPDATE | next
+     9 | myvacuum | 0 11 * * * | VACUUM                         | fixed
+(2 rows)
+
+-- Stop scheduling a job
+SELECT cron.unschedule(9);
+ unschedule 
+------------
+ t
+(1 row)
+
+SELECT jobid, jobname, schedule, command FROM cron.job ORDER BY jobid;
+ jobid | jobname | schedule |            command             
+-------+---------+----------+--------------------------------
+     2 |         | @restart | ALTER EXTENSION lt_cron UPDATE
+(1 row)
+
+SELECT cron.schedule('test1', '* * * * * *', 'select1', 'next', '8', 'sql');
+ schedule 
+----------
+       14
+(1 row)
+
+SELECT cron.schedule('test2', '* * * * * *', 'select2', 'asap', '8', 'sql');
+ schedule 
+----------
+       15
+(1 row)
+
+SELECT cron.schedule('test3', '* * * * * *', 'select3', 'single', '8', 'sql');
+ schedule 
+----------
+       16
+(1 row)
+
+SELECT cron.schedule('test4', '* * * * * *', 'select4', 'fixed', '8', 'sql');
+ schedule 
+----------
+       17
+(1 row)
+
+SELECT cron.schedule('test5', '* * * * * *', 'echo12345', 'next', '8', 'linux');
+ schedule 
+----------
+       18
+(1 row)
+
+SELECT jobid, jobname, schedule, command FROM cron.job ORDER BY jobid;
+ jobid | jobname |  schedule   |            command             
+-------+---------+-------------+--------------------------------
+     2 |         | @restart    | ALTER EXTENSION lt_cron UPDATE
+    14 | test1   | * * * * * * | select1
+    15 | test2   | * * * * * * | select2
+    16 | test3   | * * * * * * | select3
+    17 | test4   | * * * * * * | select4
+    18 | test5   | * * * * * * | echo12345
+(6 rows)
+
+SELECT pg_sleep(3);
+ pg_sleep 
+----------
+ 
+(1 row)
+
+DROP EXTENSION lt_cron;

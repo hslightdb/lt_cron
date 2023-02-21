@@ -1,0 +1,4 @@
+comment = 'Job scheduler for LightDB'
+default_version = '1.5'
+module_pathname = '$libdir/lt_cron'
+relocatable = false
